@@ -1,0 +1,181 @@
+<style>
+  body {
+    margin: 0px;
+    overflow: hidden;
+  }
+</style>
+<body>
+<script src="js/three.min.js"></script>
+<script src="js/dat.gui.min.js"></script>
+<script src="js/guify.js"></script>
+<script src="js/paper-gui-master/src/PaperGUI.js"></script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+    void main() {
+        gl_Position = vec4( position, 1.0 );
+    }
+</script>
+<script id="rule_ca" type="x-shader/x-fragment">
+  uniform int u_rule[16];
+  uniform vec2 u_resolution;
+  uniform vec3 u_mouse;
+  uniform sampler2D u_currentTexture;
+  uniform int u_frameCount;
+  uniform float u_mouseSize;
+  uniform vec3 u_newLifeColor;
+  uniform vec3 u_survivorColor;
+  uniform int u_paused;
+
+  float v(float xrel, float yrel) {
+    // Takes input relative to current pixel and returns pixel value.
+    vec2 xy;
+    xy.x = mod(gl_FragCoord.x + xrel, u_resolution.x);
+    xy.y = mod(gl_FragCoord.y + yrel, u_resolution.y);
+
+    return texture2D(u_currentTexture, xy/u_resolution).a;
+  }
+
+	void main() {
+		float minRes = min(u_resolution.x, u_resolution.y);
+		vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / minRes;
+		float inputSize = u_mouseSize / minRes;
+
+		float fate = float(v(0.,0.) == 1.);
+
+		if(u_frameCount < 2) {
+      //create random initial texture first 2 frames of program
+      if (int(gl_FragCoord.x) == int(float(u_resolution.x) / 2.0) && int(gl_FragCoord.y) == int(float(u_resolution.y) / 2.0)) {
+        fate = 1.0;
+      }
+		}
+
+		else if (u_paused == 1) {
+      int idx = int(v(-1., 1.)) * 1 + int(v(1., 1.)) * 2 + int(v(-1., -1.)) * 4 + int(v(1., -1.)) * 8;
+      for (int i = 0; i < 16; ++i) {
+        if (i == idx) {
+          fate = float(u_rule[i]);
+        }
+      }
+		}
+		gl_FragColor = vec4(fate);
+	}
+</script>
+
+<script id="life_ca" type="x-shader/x-fragment">
+  uniform vec2 u_resolution;
+  // uniform vec3 u_mouse;
+  uniform sampler2D u_currentTexture;
+  uniform int u_frameCount;
+  uniform int u_surviveLength;
+  uniform int u_bornLength;
+  // uniform float u_mouseSize;
+  // uniform vec3 u_newLifeColor;
+  // uniform vec3 u_survivorColor;
+  uniform int u_born[8];
+  uniform int u_survive[8];
+  uniform int u_paused;
+	//random noise function for initial texture
+
+	highp float rand(vec2 co) {
+		highp float a = 12.9898;
+		highp float b = 78.233;
+		highp float c = 43758.5453;
+		highp float dt = dot(co.xy ,vec2(a,b));
+		highp float sn = mod(dt,3.14);
+		return fract(sin(sn) * c);
+	}
+
+	float v(float xrel, float yrel) {
+		vec2 xy;
+		xy.x = mod(gl_FragCoord.x + xrel, u_resolution.x);
+		xy.y = mod(gl_FragCoord.y + yrel, u_resolution.y);
+
+		return texture2D(u_currentTexture, xy/u_resolution).a;
+	}
+
+	float neighborSum() {
+		return 	v(-1.,-1.) +
+				v(-1.,0.) +
+				v(-1.,1.) +
+				v(0.,-1.) +
+				v(0.,1.) +
+				v(1.,-1. )+
+				v(1.,0.) +
+				v(1.,1.);
+	}
+
+  int includes(float v, int arr[8], int limit) {
+    for (int i = 0; i < 8; ++i) {
+      if (i > limit - 1) {
+        return 1;
+      }
+    }
+    return 1;
+  }
+
+	void main() {
+		float minRes = min(u_resolution.x, u_resolution.y);
+		vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / minRes;
+		// float inputSize = u_mouseSize / minRes;
+		float fate = float(v(0.,0.) == 1.);
+		float before = fate;
+		if(u_frameCount < 2) {
+      //create random initial texture first 2 frames of program
+			float _rand = rand(uv*256.);
+			fate = clamp(floor(_rand * _rand * _rand * 1.2), 0., 1.);
+		}
+
+		else if (u_paused == 1) {
+      //calculate neighbor totals
+			float sum = neighborSum();
+      int nextState = 0;
+      for (int i = 0; i < 8; ++i) {
+        if (i > u_surviveLength - 1) {
+          break;
+        }
+        if (sum == float(u_survive[i]) && fate == 1.) {
+          nextState = 1;
+          break;
+        }
+      }
+      for (int i = 0; i < 8; ++i) {
+        if (i > u_bornLength - 1) {
+          break;
+        }
+        if (sum == float(u_born[i]) && fate == 0.) {
+          nextState = 1;
+        }
+      }
+			bool a = (sum == 3. || (fate==1. && (sum == 2.)));
+			fate = float(nextState);
+		}
+
+		// bool userInput = (u_mouse.z > 0.) &&
+		// 				((uv.x >= u_mouse.x - inputSize && uv.x < u_mouse.x + inputSize) &&
+		// 				(uv.y >= u_mouse.y - inputSize && uv.y < u_mouse.y + inputSize));
+    //
+		// fate  += float(userInput);
+		gl_FragColor = vec4(fate);
+		//change color based on status change
+		// if(fate != before) {
+		// 	gl_FragColor = vec4(vec3(u_survivorColor)/255.,fate);
+		// } else if (before == fate && v(0.,0.) == 1.) {
+		// 	gl_FragColor = vec4(vec3(u_newLifeColor)/255.,fate);
+		// }
+	}
+</script>
+
+<script id="cyclic_ca" type="x-shader/x-fragment">
+  uniform vec2 u_resolution;
+  // uniform vec3 u_mouse;
+  uniform sampler2D u_currentTexture;
+  uniform int u_frameCount;
+  // uniform float u_mouseSize;
+  // uniform vec3 u_newLifeColor;
+  // uniform vec3 u_survivorColor;
+  uniform int u_paused;
+</script>
+
+<script src="app.js"></script>
+
+</body>
