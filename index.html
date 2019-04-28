@@ -123,7 +123,7 @@
 		float before = fate;
 		if(u_frameCount < 2) //create random initial texture first 2 frames of program
 		{
-			float _rand = rand(uv*256.);
+			float _rand = rand(uv*u_time);
 			fate = clamp(floor(_rand * _rand * _rand * 1.2), 0., 1.);
 		}
 
@@ -255,7 +255,7 @@
 		// float inputSize = u_mouseSize / minRes;
 		float fate = v(0.,0.);
 		// float before = fate;
-		if(u_frameCount < 1) //create random initial texture first 2 frames of program
+		if(u_frameCount < 2) //create random initial texture first 2 frames of program
 		{
       float d = float(u_c - 1);
 			float _rand = rand(uv * 1.9);
@@ -267,31 +267,11 @@
 		{
 			float sum = float(neighborSum());
 			if (sum > float(u_t) || abs(sum - float(u_t)) < .01) {
-        // for (int i = 0; i < 14; ++i) {
-        //   if (v(0., 0.) == u_colors[i]) {
-        //     fate = u_colors[int(mod(float(i + 1), 14.))];
-        //   }
-        // }
-        // float nextColor = v(0., 0.) + 1. / 13.;
-        // if (abs(nextColor - 1. - 1. / 13.) < 0.01) {
-        //   nextColor = 0.0;
-        // }
         fate = getNextColor(v(0.,0.));
       } else {
         fate = v(0.,0.);
       }
 		}
-    // if (abs(v(0.,0.) - 0.0 - 5./13.) < 0.01) {
-    //   gl_FragColor = vec4(0., 1., 0., 1.);
-    // } else {
-    //   gl_FragColor = vec4(fate, 0., 0., 1.);
-    // }
-    // if (u_frameCount > 200) {
-    //   float val = v(0.,0.) - 0.0 - 0./13.;
-    //   if (abs(v(0.,0.) - 0.0 - 13./13.) < 0.01) {
-    //     gl_FragColor = vec4(0., 1., 0., 1.);
-    //   }
-    // }
     gl_FragColor = vec4(fate);
 	}
 </script>

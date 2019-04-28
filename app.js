@@ -24,6 +24,24 @@ var CyclicCA = function() {
   this.c = 8;
   this.on = true;
   this.moore = true;
+
+  this.resetCA = function() {
+    uniforms.u_frameCount.value = 0;
+
+    let parameters = {
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      format: THREE.RGBAFormat,
+      stencilBuffer: false
+    };
+
+    rtFront = new THREE.WebGLRenderTarget(width, height, parameters);
+    rtBack = new THREE.WebGLRenderTarget(width, height, parameters);
+    // uniforms.u_currentTexture.value = rtFront.texture;
+    // uniforms.needsUpdate = true;
+    // material.fragmentShader = document.getElementById( current_ca ).textContent;
+    // material.fragmentShader.needsUpdate = true;
+  }
 }
 
 var RuleCA = function() {
@@ -82,6 +100,10 @@ ruleFolder.add(ruleCA, "randomRule");
 ruleFolder.add(ruleCA, "pause");
 var cyclicCA = new CyclicCA();
 var cyclicFolder = g.addFolder("Cyclic");
+cyclicFolder.add(cyclicCA, "r", 1, 5).step(1);
+cyclicFolder.add(cyclicCA, "t", 1, 23).step(1);
+cyclicFolder.add(cyclicCA, "c", 1, 14).step(1);
+cyclicFolder.add(cyclicCA, "resetCA");
 
 // -----------------------------------------------------------------------------
 
@@ -217,6 +239,9 @@ function render() {
   uniforms.u_mouse.value.x += ( mouseposition.x - uniforms.u_mouse.value.x );
   uniforms.u_mouse.value.y += ( mouseposition.y - uniforms.u_mouse.value.y );
   uniforms.u_time.value = performance.now();
+  uniforms.u_r.value = cyclicCA.r;
+  uniforms.u_t.value = cyclicCA.t;
+  uniforms.u_c.value = cyclicCA.c;
   // uniforms.u_mouseSize.value = ControlPanel.Size;
   //update colors
   // uniforms.u_newLifeColor.value = ControlPanel.NewLifeColor;
