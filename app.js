@@ -1,14 +1,7 @@
 let width = window.innerWidth;
 let height = window.innerHeight;
 //let rule = [1,0,1,0,0,1,0,1,0,1,0,1,0,1,0,1];
-let colors = [[255., 248., 225.],[255., 236., 179.],[255., 224., 130.],
-              [255., 213., 79.],[255., 202., 40.],[255., 193., 7.],
-              [255., 179., 0.],[255., 160., 0.],[255., 143., 0.],
-              [255., 111., 0.],[255., 87., 34.],[244., 81., 30.],
-              [230., 74., 25.],[216., 67., 21.],[191., 54., 12.],
-              [194., 24., 91.],[173., 20., 87.],[136., 14., 79.]];
-
-let current_ca = "rule_ca";
+let current_ca = "cyclic_ca";
 let material;
 
 // LIFE PARAMETERS
@@ -24,6 +17,14 @@ let mouseposition = {
   x: 0,
   y: 0
 };
+
+var CyclicCA = function() {
+  this.r = 2;
+  this.t = 5;
+  this.c = 8;
+  this.on = true;
+  this.moore = true;
+}
 
 var RuleCA = function() {
   this.rule = [1,0,1,0,0,1,0,1,0,1,0,1,0,1,0,1];
@@ -76,9 +77,11 @@ var RuleCA = function() {
 
 var g = new dat.GUI();
 var ruleCA = new RuleCA();
-var ruleFolder = g.addFolder("Life");
+var ruleFolder = g.addFolder("Rule");
 ruleFolder.add(ruleCA, "randomRule");
 ruleFolder.add(ruleCA, "pause");
+var cyclicCA = new CyclicCA();
+var cyclicFolder = g.addFolder("Cyclic");
 
 // -----------------------------------------------------------------------------
 
@@ -117,10 +120,15 @@ function init() {
     // u_mouseSize: { type: "f", value: ControlPanel.cursorSize},
     // u_newLifeColor: {type: "v3", value: ControlPanel.NewLifeColor},
     // u_survivorColor: {type: "v3", value: ControlPanel.SurvivorColor},
-    u_born: { value: born },
-    u_bornLength: { value: bornLength },
-    u_survive: { value: survive },
-    u_surviveLength: { value: surviveLength },
+    // u_born: { value: born },
+    // u_bornLength: { value: bornLength },
+    // u_survive: { value: survive },
+    // u_surviveLength: { value: surviveLength },
+    u_r: { value: cyclicCA.r },
+    u_t: { value: cyclicCA.t },
+    u_c: { value: cyclicCA.c },
+    u_moore: { value: cyclicCA.moore },
+    u_time: { value: performance.now() },
     u_paused: {type: 'i', value: 1}
   };
 
@@ -208,6 +216,7 @@ function render() {
   uniforms.u_frameCount.value++;
   uniforms.u_mouse.value.x += ( mouseposition.x - uniforms.u_mouse.value.x );
   uniforms.u_mouse.value.y += ( mouseposition.y - uniforms.u_mouse.value.y );
+  uniforms.u_time.value = performance.now();
   // uniforms.u_mouseSize.value = ControlPanel.Size;
   //update colors
   // uniforms.u_newLifeColor.value = ControlPanel.NewLifeColor;
