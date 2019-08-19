@@ -9,11 +9,16 @@
 <script src="libraries/dat.gui.min.js"></script>
 <script src="libraries/guify.js"></script>
 
-<script id="vertexShader" type="x-shader/x-vertex">
-    void main() {
-        gl_Position = vec4( position, 1.0 );
-    }
-</script>
+<script id="vertexShader" type="x-shader/x-fragment">
+          varying vec2 vUv;
+
+          void main()
+          {
+              vUv = uv;
+              vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+              gl_Position = projectionMatrix * mvPosition;
+          }
+      </script>
 <script id="rule_ca" type="x-shader/x-fragment">
   uniform int u_rule[16];
   uniform vec2 u_resolution;
@@ -150,6 +155,296 @@
 </script>
 
 <script id="cyclic_ca" type="x-shader/x-fragment">
+			uniform float u_time;
+			uniform vec2 u_resolution;
+			uniform sampler2D u_currentTexture;
+      uniform int u_frameCount;
+      uniform int u_c;
+      uniform int u_r;
+      uniform int u_t;
+      uniform bool u_moore;
+      uniform int u_paused;
+			varying vec2 vUv;
+
+      float v(float xrel, float yrel) {
+    		vec2 xy;
+    		xy.x = mod(gl_FragCoord.x + xrel, u_resolution.x);
+    		xy.y = mod(gl_FragCoord.y + yrel, u_resolution.y);
+
+    		return texture2D(u_currentTexture, xy/u_resolution).r;
+    	}
+
+						highp float rand(vec2 co)
+						{
+						  // random function
+							highp float a = 12.9898;
+							highp float b = 78.233;
+							highp float c = 43758.5453;
+							highp float dt= dot(co.xy ,vec2(a,b));
+							highp float sn= mod(dt,3.14);
+							return fract(sin(sn) * c);
+						}
+
+            float initialize()
+            {
+                float r = rand(gl_FragCoord.xy + vec2(40.0, 2000.0));
+                return floor(r * float(u_c) + 1e-10) / float(u_c);
+            }
+
+            int cellState(vec2 delta)
+            {
+                return int((float(u_c) * texture2D(u_currentTexture, vec2(mod(vUv.x + delta.x, 1.0), mod(vUv.y + delta.y, 1.0))).r) + 0.5);
+            }
+
+            bool match(int mid, vec2 delta)
+            {
+              vec2 d = (1.0) / u_resolution;
+                if (mid == cellState(delta))
+                    return true;
+                return false;
+            }
+
+            int sumNM(int mid, vec2 d)
+            {
+                // Moore neighborhood
+                int sum = 0;
+                for (int x = 0; x <= 20; ++x)
+                {
+									if (x == u_r * 2 + 1)
+											break;
+                    for (int y = 0; y <= 20; ++y)
+                    {
+                        if (x == u_r && y == u_r)
+                            continue;
+												if (y == u_r * 2 + 1)
+														break;
+                        if (match(mid, vec2((float(x - u_r)) * d.x, (float(y - u_r)) * d.y)))
+                            sum += 1;
+                    }
+                }
+                return sum;
+            }
+
+            int sumNN(int mid, vec2 d)
+            {
+                // Von Neumann neighborhood
+                int sum = 0;
+                for (int x = 0; x <= 20; ++x)
+                {
+									if (x == u_r * 2 + 1)
+											break;
+                    for (int y = 0; y <= 20; ++y)
+                    {
+                        if (x == u_r && y == u_r)
+                            continue;
+												if (y == u_r * 2 + 1)
+														break;
+                        if (float(u_r) < (abs(float(x - u_r)) + abs(float(y - u_r))))
+                            continue;
+                        if (match(mid, vec2(float(x - u_r) * d.x, float(y - u_r) * d.y)))
+                            sum += 1;
+                    }
+                }
+                return sum;
+            }
+
+            float calc()
+            {
+                vec2 d = (1.0) / u_resolution;
+
+                int cell = cellState(vec2(0.0, 0.0));
+
+                int mid = cell - 1;
+                if (mid < 0) mid = u_c - 1;
+
+                int sum = 0;
+                if (u_moore)
+                    sum = sumNN(mid, d);
+                else
+                    sum = sumNM(mid, d);
+
+                if (u_t <= sum)
+                    cell = mid;
+
+                return float(cell) / float(u_c);
+            }
+
+			void main()
+            {
+                float r = v(0.,0.);
+                if (u_frameCount < 2)
+                    r = initialize();
+                else if (u_paused == 1)
+                    r = calc();
+
+				gl_FragColor = vec4(r, mod(r * 2.6, 1.), mod(r * 6.4, 1.), 1.);
+			}
+</script>
+
+<script id="gray_scott" type="x-shader/x-fragment">
+  uniform vec2 u_resolution;
+  // uniform vec3 u_mouse;
+  uniform sampler2D u_currentTexture;
+  uniform int u_frameCount;
+  // uniform float u_mouseSize;
+  uniform int u_paused;
+  uniform float u_time;
+  uniform int u_t;
+  uniform int u_r;
+  uniform int u_c;
+  uniform bool u_moore;
+  float feed = .0367;
+  float kill = .0649;
+  float delta = 1.;
+  uniform int u_w;
+  uniform int u_h;
+  float dA = 1.0;
+  float dB = 0.4;
+
+  vec2 v(float xrel, float yrel) {
+		vec2 xy;
+		xy.x = mod(gl_FragCoord.x + xrel, u_resolution.x);
+		xy.y = mod(gl_FragCoord.y + yrel, u_resolution.y);
+
+		return texture2D(u_currentTexture, xy/u_resolution).rg;
+	}
+
+  void main() {
+
+    if(u_frameCount < 20) //create random initial texture first 2 frames of program
+		{
+      if (abs(gl_FragCoord.x - float(u_w) / 2.) < 10. && abs(gl_FragCoord.y - float(u_h) / 2.) < 10.) {
+        for (int i = 0; i < 10; ++i) {
+          for (int j = 0; j < 10; ++j) {
+            gl_FragColor = vec4(1., 1., 0., 1.);
+          }
+        }
+      } else {
+        gl_FragColor = vec4(1., 0., 0., 1.);
+      }
+		}
+    else if (u_paused == 1) {
+      vec2 uv = v(0.,0.);
+      vec2 uv0 = v(-1.,0.);
+      vec2 uv1 = v(1.,0.);
+      vec2 uv2 = v(0.,-1.);
+      vec2 uv3 = v(0.,1.);
+      vec2 uv4 = v(-1.,-1.);
+      vec2 uv5 = v(1.,1.);
+      vec2 uv6 = v(1.,-1.);
+      vec2 uv7 = v(-1.,1.);
+
+      vec2 lapl = (uv0 * .2 + uv1 * .2  + uv2 * .2  + uv3 * .2 + uv4 * .05 + uv5 * .05 + uv6 * .05 + uv7 * .05 - uv);//10485.76;
+      float du = /*0.00002*/dA*lapl.r - uv.r*uv.g*uv.g + feed*(1.0 - uv.r);
+      float dv = /*0.00001*/dB*lapl.g + uv.r*uv.g*uv.g - (feed+kill)*uv.g;
+      vec2 dst = uv + 1.*vec2(du, dv);
+      gl_FragColor = vec4(dst.r, dst.g, 0.0, 1.0);
+    }
+
+  }
+</script>
+
+<script id="symm_ca" type="x-shader/x-fragment">
+  uniform vec2 u_resolution;
+  // uniform vec3 u_mouse;
+  uniform sampler2D u_currentTexture;
+  uniform int u_frameCount;
+  // uniform float u_mouseSize;
+  uniform int u_paused;
+  uniform float u_time;
+  uniform int u_t;
+  uniform int u_r;
+  uniform int u_c;
+  uniform bool u_moore;
+  uniform int u_zeros[100];
+  uniform int u_ones[100];
+
+  bool inOnes(int idx) {
+    for (int i = 0; i < 100; ++i) {
+      if (idx == u_ones[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool inZeros(int idx) {
+    for (int i = 0; i < 100; ++i) {
+      if (idx == u_zeros[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  int pow(int idx) {
+    int val = 1;
+    for (int i = 0; i < 100; ++i) {
+      if (idx == i) {
+        return val;
+      }
+      val = val * 2;
+    }
+    return val;
+  }
+
+  highp float rand(vec2 co)
+  	{
+  		highp float a = 12.9898;
+  		highp float b = 78.233;
+  		highp float c = 43758.5453;
+  		highp float dt= dot(co.xy ,vec2(a,b));
+  		highp float sn= mod(dt,3.14);
+  		return fract(sin(sn) * c);
+  	}
+
+	float v(float xrel, float yrel) {
+		vec2 xy;
+		xy.x = mod(gl_FragCoord.x + xrel, u_resolution.x);
+		xy.y = mod(gl_FragCoord.y + yrel, u_resolution.y);
+		return texture2D(u_currentTexture, xy/u_resolution).a;
+	}
+
+  int count() {
+    int val = 0;
+    int idx = 0;
+    for (int i = -1; i < 2; ++i) {
+      for (int j = -1; j < 2; ++j) {
+        if ((v(float(i), float(j)) - 1.) < .1) {
+          val += pow(idx);
+        }
+        idx += 1;
+      }
+    }
+    return val;
+  }
+
+  void main() {
+		float minRes = min(u_resolution.x, u_resolution.y);
+		vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / minRes;
+
+    if(u_frameCount < 200) {
+      //create random initial texture first 2 frames of program
+      if (int(gl_FragCoord.x) == int(float(u_resolution.x) / 2.0) && int(gl_FragCoord.y) == int(float(u_resolution.y) / 2.0)) {
+        gl_FragColor = vec4(0.0);
+      } else {
+        gl_FragColor = vec4(1.0);
+      }
+		}
+    else if (u_paused == 1) {
+      int idx = 2;
+      if (inOnes(idx)) {
+        gl_FragColor = vec4(0.);
+      } else if (inZeros(idx)) {
+        gl_FragColor = vec4(1.);
+      } else {
+        gl_FragColor = vec4(v(0.,0.));
+      }
+    }
+  }
+</script>
+
+<script id="stepping_stone" type="x-shader/x-fragment">
   uniform vec2 u_resolution;
   // uniform vec3 u_mouse;
   uniform sampler2D u_currentTexture;
@@ -162,118 +457,52 @@
   uniform int u_c;
   uniform bool u_moore;
 
-  int r = 1;
-
-	//random noise function for initial texture
-
   highp float rand(vec2 co)
-	{
-		highp float a = 12.9898;
-		highp float b = 78.233;
-		highp float c = 43758.5453;
-		highp float dt= dot(co.xy ,vec2(a,b));
-		highp float sn= mod(dt,3.14);
-		return fract(sin(sn) * c);
-	}
+  	{
+  		highp float a = 12.9898;
+  		highp float b = 78.233;
+  		highp float c = 43758.5453;
+  		highp float dt= dot(co.xy ,vec2(a,b));
+  		highp float sn= mod(dt,3.14);
+  		return fract(sin(sn) * c);
+  	}
 
-  float rand2(float n)
-  {
-    return fract(sin(n) * 43758.5453123);
-  }
-
-	float v(float xrel, float yrel) {
+	vec4 v(float xrel, float yrel) {
 		vec2 xy;
 		xy.x = mod(gl_FragCoord.x + xrel, u_resolution.x);
 		xy.y = mod(gl_FragCoord.y + yrel, u_resolution.y);
-
-		return texture2D(u_currentTexture, xy/u_resolution).a;
+		return texture2D(u_currentTexture, xy/u_resolution);
 	}
 
-  float getNextColor(float c) {
-    for (int i = 0; i < 19; ++i) {
-      if (u_c == i) {
-        break;
-      }
-      float d = float(u_c - 1);
-      if (abs(c - float(i) * 1. / d) < .01) {
-        float nextColor = float(i) * 1. / d + 1. / d;
-        if (abs(nextColor - 1. - 1./d) < 0.01) {
-          nextColor = 0.0;
-        }
-        return nextColor;
-      }
-    }
-  }
-
-	int neighborSum() {
-    int count = 0;
-    if (u_moore) {
-      // for (int x = 0; x > -6; --x) {
-      //   for (int y = 0; y > -6; --y) {
-      //     if (abs(abs(float(x)) - float(u_r)) < .01 && abs(abs(float(y)) - float(u_r)) < .01) {
-      //       break;
-      //     }
-      //     if (abs(float(x)) > float(u_r) || abs(float(y)) > float(u_r)) {
-      //       continue;
-      //     }
-      //     if (abs(v(float(x), float(y)) - getNextColor(v(0., 0.))) < .01) {
-      //       count = count + 1;
-      //     }
-      //   }
-      // }
-      for (int x = -5; x < 6; ++x) {
-        for (int y = -5; y < 6; ++y) {
-          if (abs(float(x)) > float(u_r) || abs(float(y)) > float(u_r)) {
-            continue;
-          }
-          if (abs(v(float(x), float(y)) - getNextColor(v(0., 0.))) < .01) {
-            count = count + 1;
-          }
-        }
-      }
-    } else {
-      if (abs(v(-1., 0.) - getNextColor(v(0., 0.))) < .01) {
-        count = count + 1;
-      }
-      if (abs(v(1., 0.) - getNextColor(v(0., 0.))) < .01) {
-        count = count + 1;
-      }
-      if (abs(v(0., 1.) - getNextColor(v(0., 0.))) < .01) {
-        count = count + 1;
-      }
-      if (abs(v(0., -1.) - getNextColor(v(0., 0.))) < .01) {
-        count = count + 1;
-      }
-    }
-    return count;
-	}
-
-  void main()
-	{
+  void main() {
 		float minRes = min(u_resolution.x, u_resolution.y);
 		vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / minRes;
-		// float inputSize = u_mouseSize / minRes;
-		float fate = v(0.,0.);
-		// float before = fate;
-		if(u_frameCount < 2) //create random initial texture first 2 frames of program
-		{
-      float d = float(u_c - 1);
-			float _rand = rand(uv * 1.9);
-      float j = sign(_rand * d)*floor(abs(_rand * d)+.5);
-      fate = (j) * 1. / d;
-		}
-
-		else if (u_paused == 1)//calculate neighbor totals
-		{
-			float sum = float(neighborSum());
-			if (sum > float(u_t) || abs(sum - float(u_t)) < .01) {
-        fate = getNextColor(v(0.,0.));
+    vec4 fate = v(0.,0.);
+    if (u_frameCount < 2) {
+      float _rand = random(uv * 1.5 * u_time);
+      gl_FragColor = vec4(_rand);
+    }
+    else if (u_paused == 1) {
+      float _rand = rand(uv * 1.5 * u_time);
+      if (_rand < 0.5) {
+        float _rand2 = rand(uv * 1. * u_time) * 3.;
+        int n = int(sign(_rand2)*floor(abs(_rand2)+.5));
+        if (n == 0) {
+          gl_FragColor = v(0.,1.);
+        } else if (n == 1) {
+          gl_FragColor = v(1.,0.);
+        } else if (n == 2) {
+          gl_FragColor = v(0.,-1.);
+        } else if (n == 3) {
+          gl_FragColor = v(-1.,0.);
+        }
       } else {
-        fate = v(0.,0.);
+        gl_FragColor = vec4(fate.r, fate.g, fate.b, 1.);
       }
-		}
-    gl_FragColor = vec4(fate);
-	}
+    } else {
+      gl_FragColor = vec4(fate.r, fate.g, fate.b, 1.);
+    }
+  }
 </script>
 
 <script src="app.js"></script>
