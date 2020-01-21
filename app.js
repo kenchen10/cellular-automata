@@ -229,7 +229,7 @@ var CyclicCA = function() {
 
   this.randomRule = function() {
     this.r = Math.floor(Math.random() * 5 + 1);
-    this.c = Math.floor(Math.random() * 14 + 1);
+    this.c = Math.floor(Math.random() * 14 + 3);
     this.t = Math.floor(Math.random() * 23 + 1);
     this.moore = Math.random() > .5 ? false : true;
     uniforms.u_r.value = this.r;
