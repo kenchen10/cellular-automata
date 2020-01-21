@@ -220,19 +220,22 @@ var CyclicCA = function() {
 
     rtFront = new THREE.WebGLRenderTarget(width, height, parameters);
     rtBack = new THREE.WebGLRenderTarget(width, height, parameters);
-    // uniforms.u_currentTexture.value = rtFront.texture;
-    // uniforms.needsUpdate = true;
-    // material.fragmentShader = document.getElementById( current_ca ).textContent;
-    // material.fragmentShader.needsUpdate = true;
+    uniforms.u_currentTexture.value = rtFront.texture;
+    uniforms.needsUpdate = true;
+    material.fragmentShader = document.getElementById( current_ca ).textContent;
+    material.fragmentShader.needsUpdate = true;
+
   }
 
   this.randomRule = function() {
-    this.r = Math.random() * 20;
-    this.c = Math.random() * 20;
-    this.t = Math.random() * 20;
+    this.r = Math.floor(Math.random() * 5 + 1);
+    this.c = Math.floor(Math.random() * 14 + 1);
+    this.t = Math.floor(Math.random() * 23 + 1);
+    this.moore = Math.random() > .5 ? false : true;
     uniforms.u_r.value = this.r;
     uniforms.u_c.value = this.c;
     uniforms.u_t.value = this.t;
+    uniforms.u_moore.value = this.moore;
     this.resetCA();
   }
 
@@ -290,15 +293,16 @@ var RuleCA = function() {
 var g = new dat.GUI();
 var ruleCA = new RuleCA();
 g.add(ruleCA, "pause");
-var ruleFolder = g.addFolder("Rule");
-ruleFolder.add(ruleCA, "randomRule");
+// var ruleFolder = g.addFolder("Rule");
+// ruleFolder.add(ruleCA, "randomRule");
 var cyclicCA = new CyclicCA();
 var cyclicFolder = g.addFolder("Cyclic");
-cyclicFolder.add(cyclicCA, "r", 1, 5).step(1);
-cyclicFolder.add(cyclicCA, "t", 1, 23).step(1);
-cyclicFolder.add(cyclicCA, "c", 1, 14).step(1);
+cyclicFolder.add(cyclicCA, "r", 1, 5).step(1).listen();
+cyclicFolder.add(cyclicCA, "t", 1, 23).step(1).listen();
+cyclicFolder.add(cyclicCA, "c", 1, 14).step(1).listen();
 cyclicFolder.add(cyclicCA, "resetCA");
-cyclicFolder.add(cyclicCA, "moore");
+cyclicFolder.add(cyclicCA, "moore").listen();
+cyclicFolder.add(cyclicCA, "randomRule");
 var symmCA = new SymmCA();
 symmCA.getSymms();
 symmCA.generateRule(0);
@@ -501,22 +505,22 @@ function generateLifeRule() {
   }
 }
 
-function randomRule() {
-  if (rule_on) {
-    generateRule();
-    uniforms.u_rule.value = rule;
-  } else if (life_on) {
-    generateLifeRule();
-    console.log(born, survive, born.length, survive.length);
-    uniforms.u_born.value = born;
-    uniforms.u_survive.value = survive;
-    uniforms.u_bornLength = born.length;
-    uniforms.u_surviveLength = survive.length;
-  }
-
-  resetCA();
-  reInit();
-}
+// function randomRule() {
+//   if (rule_on) {
+//     generateRule();
+//     uniforms.u_rule.value = rule;
+//   } else if (life_on) {
+//     generateLifeRule();
+//     console.log(born, survive, born.length, survive.length);
+//     uniforms.u_born.value = born;
+//     uniforms.u_survive.value = survive;
+//     uniforms.u_bornLength = born.length;
+//     uniforms.u_surviveLength = survive.length;
+//   }
+//
+//   resetCA();
+//   reInit();
+// }
 
 function reInit() {
   if (life_on) {
